@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>body {margin: 0}</style>
+</head>
+<body>
+  <script id="vertexShader" type="x-shader/x-vertex">
+    varying vec2 v_uv;
+    void main() {
+      v_uv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  </script>
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    const float padding = 0.1;
+    const float cellWidth = (1.0 - 3.0 * padding) / 3.0;
+    const float pi = 3.1415926;
+    const float distFreq = 100.0;
+    const float distMag = 0.1 / distFreq;
+
+    float softClamp(float x) {
+      return 1.0 - 1.0 / (x + 1.0);
+    }
+
+    vec3 pixel(vec2 pos, vec3 color) {
+      float x = pos.x;
+      float y = pos.y;
+      float threeX = 3.0 * x;
+      float brightness = softClamp(10.0 * sin(y * pi) * abs(sin(threeX * pi)));
+      if (threeX < 1.0) return vec3(color.x * brightness, 0.0, 0.0);
+      if (threeX < 2.0) return vec3(0.0, color.y * brightness, 0.0);
+      return vec3(0.0, 0.0, color.z * brightness);
+    }
+
+    float stripe(float x) {
+      return sin(x / 2.0);
+    }
+
+    float jagged(float x) {
+      float modX = mod(x, 4.0);
+      return clamp(modX, 0.0, 1.0) - clamp(modX - 2.0, 0.0, 1.0);
+    }
+
+    float jaggedSpikes(float x) {
+      float modX = mod(x, 8.0);
+      return clamp(modX, 0.0, 1.0) - clamp(modX - 1.0, 0.0, 1.0) - clamp(modX - 4.0, 0.0, 1.0) + clamp(modX - 5.0, 0.0, 1.0);
+    }
+
+    float smoother(float x) {
+      return x - sin(2.0 * pi * x) / (2.0 * pi);
+    }
+
+    varying vec2 v_uv;
+    uniform float millis;
+    //uniform sampler2D texture;
+    //vec4 tex;
+    void main() {
+      //tex = texture2D(texture, v_uv);
+      float scale = 100.0;
+      vec2 distorted = v_uv;
+      distorted.x += jagged(distorted.y * distFreq) * distMag;
+      distorted.y += jagged(distorted.x * distFreq) * distMag;
+      distorted.x += floor(mod(distorted.y * 100.0, 2.0)) * smoother(jaggedSpikes(millis / 1000.0)) / scale;
+      distorted.y += floor(mod(distorted.x * 100.0, 2.0)) * smoother(jaggedSpikes(millis / 1000.0 - 2.0)) / scale;
+      vec2 fractPos = fract(distorted * scale);
+      vec2 boxPos = distorted * scale - fractPos;
+      float rad = distance(boxPos, vec2(scale / 2.0, scale / 2.0));
+      float angle = atan(boxPos.x - scale / 2.0, -(boxPos.y - scale / 2.0));
+      float angleFunc = 1.0 * abs(angle);
+      vec3 stripes = vec3(
+        stripe(millis / 300.0 + rad + angleFunc * 10.0 + 1.0),
+        stripe(millis / 300.0 + rad + angleFunc * 10.0 + 2.0),
+        stripe(millis / 300.0 + rad + angleFunc * 10.0 + 3.0)
+      );
+      //stripes = vec3(1.0, 0.5, 1.0);
+      gl_FragColor = vec4(pixel(fractPos, stripes), 1.0);
+    }
+  </script>
+  <script src="js/three.min.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>
